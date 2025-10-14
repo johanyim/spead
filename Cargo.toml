@@ -1,10 +1,13 @@
 [package]
 name = "spead"
+description = "Structure Preserving Encryption and Decryption CLI tool"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+camino = "1.2.1"
 clap = { version = "4.5.49", features = ["derive"] }
+scanpw = "1.0.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 serde_toml = "0.0.1"
