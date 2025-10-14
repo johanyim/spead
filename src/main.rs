@@ -82,4 +82,8 @@ fn main() {
             password
         }
     };
+
+    // determine the type of the file
+
+    // do the encryption!
 }
