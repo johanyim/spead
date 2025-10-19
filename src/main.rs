@@ -1,5 +1,12 @@
+mod encryption;
+mod error;
+mod prelude;
+
+use std::str::FromStr;
+
 use camino::Utf8PathBuf;
 use clap::{arg, error::ErrorKind, CommandFactory, Parser};
+use prelude::*;
 use scanpw::scanpw;
 use serde::Serialize;
 
@@ -43,12 +50,12 @@ struct Cli {
     repeat: u16,
 }
 
-fn main() {
+fn main() -> Result<()> {
     let cli = Cli::parse();
     println!("{cli:#?}");
 
     // check the input exists
-    if let Some(input) = cli.input
+    if let Some(ref input) = cli.input
         && !input.exists()
     {
         let mut cmd = Cli::command();
@@ -83,7 +90,30 @@ fn main() {
         }
     };
 
+    let file = std::fs::File::open(cli.input.unwrap()).unwrap();
+
+    let reader = std::io::BufReader::new(file);
+    let s = std::io::read_to_string(reader).unwrap();
+
     // determine the type of the file
 
-    // do the encryption!
+    // TODO: consider from_reader
+    let mut val: serde_json::Value = serde_json::from_str(&s).unwrap();
+
+    // key derivation
+    let secret_key = encryption::kdf::generate(password)?;
+
+    for (_k, v) in val.as_object_mut().unwrap() {
+        let mut bytes: Vec<u8> = Vec::new();
+        serde_json::to_writer(&mut bytes, &v).unwrap();
+
+        let new_bytes = encryption::chacha::encrypt(bytes, secret_key);
+        *v = new_bytes.into()
+    }
+
+    let output = serde_json::to_string(&val).unwrap();
+
+    println!("{output}");
+    //do the encryption!
+    Ok(())
 }
