@@ -2,7 +2,10 @@ mod encryption;
 mod error;
 mod prelude;
 
-use std::{io::Write, str::FromStr};
+use std::{
+    io::{stdin, Read, Write},
+    str::FromStr,
+};
 
 use camino::Utf8PathBuf;
 use clap::{arg, error::ErrorKind, CommandFactory, Parser};
@@ -24,7 +27,7 @@ enum EncryptionMethod {
 #[derive(Parser, Debug)]
 #[command(version, long_about)]
 struct Cli {
-    #[arg(required = true, value_name = "file")]
+    #[arg(value_name = "file")]
     input: Option<Utf8PathBuf>,
 
     /// Which encryption method to use
@@ -32,12 +35,12 @@ struct Cli {
     method: EncryptionMethod,
 
     /// Encryption/Decryption key as a path to a file
-    #[arg(short, long, value_name = "path")]
-    key: Option<Utf8PathBuf>,
+    #[arg(short = 'k', long, value_name = "file")]
+    password_file: Option<Utf8PathBuf>,
 
     /// Encryption/Decryption key as an argument
-    #[arg(short, long, value_name = "key")]
-    raw_key: Option<String>,
+    #[arg(short, long, value_name = "password")]
+    password: Option<String>,
 
     /// Modify the file in-place, rather than printing to stdout
     #[arg(short, long)]
@@ -55,21 +58,8 @@ struct Cli {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // check the input exists
-    if let Some(ref input) = cli.input
-        && !input.exists()
-    {
-        let mut cmd = Cli::command();
-        cmd.error(
-            ErrorKind::ValueValidation,
-            format!("file not found: {}", input),
-        )
-        .exit();
-    }
-
-    if cli.key.is_some() && cli.raw_key.is_some() {}
-
-    let password = match (cli.raw_key, cli.key) {
+    // 1.: Password
+    let password = match (cli.password, cli.password_file) {
         (Some(_), Some(_)) => {
             let mut cmd = Cli::command();
             cmd.error(
@@ -98,14 +88,39 @@ fn main() -> Result<()> {
         }
     };
 
-    // open file and read to value
-    let file = std::fs::File::open(cli.input.unwrap()).unwrap();
-    let mut reader = std::io::BufReader::new(file);
+    // 2.: determine the source of the input
 
-    // TODO: determine the type of file
+    let mut val: serde_json::Value = match cli.input {
+        Some(file) if file.exists() => {
+            // open file and read to value
+            let f = std::fs::File::open(file).unwrap();
+            let mut reader = std::io::BufReader::new(f);
 
-    // json
-    let mut val: serde_json::Value = serde_json::from_reader(&mut reader).unwrap();
+            // TODO: determine the type of file
+
+            // json
+            serde_json::from_reader(&mut reader).unwrap()
+        }
+        Some(file) => {
+            let mut cmd = Cli::command();
+            cmd.error(
+                ErrorKind::ValueValidation,
+                format!("file not found: {}", file),
+            )
+            .exit()
+        }
+        None => {
+            // TODO: determine the type of file
+
+            serde_json::from_reader(stdin().lock()).unwrap()
+        }
+    };
+
+    //// check the input exists
+    //if let Some(ref input) = cli.input
+    //    && !input.exists()
+    //{
+    //}
 
     // key derivation
     let secret_key = encryption::kdf::generate(password)?;
@@ -157,13 +172,8 @@ impl Spead {
                 .to_string();
 
                 let alphabet = Alphabet::numeric();
-                //let alphabet = Alphabet::try_from("10").unwrap();
-                //let x = sign
-                //    + &alphabet
-                //        .decrypt(&secret_key, b"abc", &s)
-                //        .unwrap()
-                //        .trim_start_matches('0');
-                // IDEA: split by first, rest?
+
+                // NOTE: first number is random, rest is deterministic
                 // NOTE: may be all zeros (10^-16)
                 let enc = match s.split_once('.') {
                     None => {
@@ -173,7 +183,7 @@ impl Spead {
                                 let encrypted = alphabet
                                     .encrypt(&secret_key, current_pointer.as_bytes(), &padded)
                                     .unwrap();
-                                format!("1{encrypted}")
+                                format!("{}{encrypted}", rand::random_range(1..=9u8))
                             }
                             Spead::JsonDecrypt => {
                                 //let padded = format!("{s:0>30}");
@@ -192,10 +202,6 @@ impl Spead {
                         //encrypted.trim_start_matches('0').to_string()
                     }
                     Some((left, right)) => {
-                        //let left_padded = format!("{left:0>12}"); // appending
-                        let right_padded = format!("{right:0<12}");
-
-                        // json pointer
                         let left_pointer = format!("{current_pointer}/left");
                         let right_pointer = format!("{current_pointer}/right");
 
@@ -205,7 +211,8 @@ impl Spead {
                                 let encrypted = alphabet
                                     .encrypt(&secret_key, left_pointer.as_bytes(), &left_padded)
                                     .unwrap();
-                                format!("1{encrypted}")
+                                let random = rand::random_range(1..=9u8);
+                                format!("{}{encrypted}", random)
                             }
                             Spead::JsonDecrypt => {
                                 //let padded = format!("{s:0>30}");
@@ -223,17 +230,26 @@ impl Spead {
 
                         // TODO:
                         let right_enc = match self {
-                            Spead::JsonEncrypt => alphabet
-                                // TODO: differentiate right and right since they use the same nonce
-                                .encrypt(&secret_key, right_pointer.as_bytes(), &right_padded)
-                                .unwrap(),
-                            Spead::JsonDecrypt => alphabet
-                                // TODO: differentiate right and right since they use the same nonce
-                                .decrypt(&secret_key, right_pointer.as_bytes(), &right_padded)
-                                .unwrap(),
+                            Spead::JsonEncrypt => {
+                                let right_padded = format!("{right:0<12}");
+                                let encrypted = alphabet
+                                    .encrypt(&secret_key, right_pointer.as_bytes(), &right_padded)
+                                    .unwrap();
+                                let random = rand::random_range(1..=9u8);
+                                format!("{encrypted}{}", random)
+                            }
+                            Spead::JsonDecrypt => {
+                                //let padded = format!("{s:0>30}");
+                                let unpadded = &right[0..right.len() - 1];
+                                let decrypted = alphabet
+                                    .decrypt(&secret_key, right_pointer.as_bytes(), &unpadded)
+                                    .unwrap();
+
+                                decrypted.trim_end_matches('0').to_string()
+                            }
                         };
 
-                        format!("{}.{}", left_enc, right_enc.trim_end_matches('0'))
+                        format!("{}.{}", left_enc, right_enc)
                     }
                 };
 
