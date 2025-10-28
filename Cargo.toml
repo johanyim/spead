@@ -3,14 +3,18 @@ name = "spead"
 description = "Structure Preserving Encryption and Decryption CLI tool"
 version = "0.1.0"
 edition = "2024"
+authors = ["Johan Yim <johanjyyim@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/johanyim/spead"
+homepage = "https://github.com/johanyim/spead"
+categories = ["command-line-utilities"]
+keywords = ["cli", "encryption", "cryptography"]
+readme = "README.md"
 
 [dependencies]
-aes-gcm-siv = "0.11.1"
 anyhow = "1.0.100"
 argon2 = "0.5.3"
 camino = "1.2.1"
-chacha = "0.4.0"
-chacha20 = "0.9.1"
 clap = { version = "4.5.49", features = ["derive"] }
 cloudproof_fpe = "0.2.2"
 rand = "0.9.2"

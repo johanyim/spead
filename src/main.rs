@@ -10,7 +10,7 @@ use std::{
 use camino::Utf8PathBuf;
 use clap::{arg, error::ErrorKind, CommandFactory, Parser};
 use cloudproof_fpe::core::Alphabet;
-use encryption::{kdf, KEY_LEN};
+use encryption::KEY_LEN;
 use prelude::*;
 use serde::Serialize;
 use serde_json::Number;
@@ -89,7 +89,6 @@ fn main() -> Result<()> {
     };
 
     // 2.: determine the source of the input
-
     let mut val: serde_json::Value = match cli.input {
         Some(file) if file.exists() => {
             // open file and read to value
@@ -116,16 +115,8 @@ fn main() -> Result<()> {
         }
     };
 
-    //// check the input exists
-    //if let Some(ref input) = cli.input
-    //    && !input.exists()
-    //{
-    //}
-
-    // key derivation
+    // 3.: key derivation
     let secret_key = encryption::kdf::generate(password)?;
-
-    //println!("{val:#?}");
 
     let method = match cli.decrypt {
         true => Spead::JsonDecrypt,
