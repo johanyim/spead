@@ -1,5 +1,6 @@
 mod encryption;
 mod error;
+mod numeric;
 mod prelude;
 
 use std::{
@@ -177,12 +178,16 @@ impl Spead {
                 let enc = match s.split_once('.') {
                     None => {
                         match self {
-                            Spead::JsonEncrypt => {
-                                encrypt_integral(&secret_key, current_pointer.as_bytes(), &s)
-                            }
-                            Spead::JsonDecrypt => {
-                                decrypt_integral(&secret_key, current_pointer.as_bytes(), &s)
-                            }
+                            Spead::JsonEncrypt => numeric::encrypt_integral(
+                                &secret_key,
+                                current_pointer.as_bytes(),
+                                &s,
+                            ),
+                            Spead::JsonDecrypt => numeric::decrypt_integral(
+                                &secret_key,
+                                current_pointer.as_bytes(),
+                                &s,
+                            ),
                         }
 
                         //encrypted.trim_start_matches('0').to_string()
@@ -192,21 +197,29 @@ impl Spead {
                         let right_pointer = format!("{current_pointer}/right");
 
                         let left_enc = match self {
-                            Spead::JsonEncrypt => {
-                                encrypt_integral(&secret_key, left_pointer.as_bytes(), &left)
-                            }
-                            Spead::JsonDecrypt => {
-                                decrypt_integral(&secret_key, left_pointer.as_bytes(), &left)
-                            }
+                            Spead::JsonEncrypt => numeric::encrypt_integral(
+                                &secret_key,
+                                left_pointer.as_bytes(),
+                                &left,
+                            ),
+                            Spead::JsonDecrypt => numeric::decrypt_integral(
+                                &secret_key,
+                                left_pointer.as_bytes(),
+                                &left,
+                            ),
                         };
 
                         let right_enc = match self {
-                            Spead::JsonEncrypt => {
-                                encrypt_fractional(&secret_key, right_pointer.as_bytes(), &right)
-                            }
-                            Spead::JsonDecrypt => {
-                                decrypt_fractional(&secret_key, right_pointer.as_bytes(), &right)
-                            }
+                            Spead::JsonEncrypt => numeric::encrypt_fractional(
+                                &secret_key,
+                                right_pointer.as_bytes(),
+                                &right,
+                            ),
+                            Spead::JsonDecrypt => numeric::decrypt_fractional(
+                                &secret_key,
+                                right_pointer.as_bytes(),
+                                &right,
+                            ),
                         };
 
                         left_enc + "." + &right_enc
@@ -246,65 +259,5 @@ impl Spead {
             }
             _ => {}
         }
-    }
-}
-
-fn encrypt_integral(secret_key: &[u8], salt: &[u8], s: &str) -> String {
-    let alphabet = Alphabet::numeric();
-    let padded = format!("{s:0>12}");
-    let encrypted = alphabet.encrypt(&secret_key, salt, &padded).unwrap();
-    format!("{}{encrypted}", rand::random_range(1..=9u8))
-}
-
-fn decrypt_integral(secret_key: &[u8], salt: &[u8], s: &str) -> String {
-    let alphabet = Alphabet::numeric();
-    let unpadded = &s[1..];
-    let decrypted = alphabet.decrypt(&secret_key, salt, &unpadded).unwrap();
-
-    let trimmed = decrypted.trim_start_matches('0');
-    match trimmed.is_empty() {
-        true => "0",
-        false => trimmed,
-    }
-    .to_string()
-}
-
-fn encrypt_fractional(secret_key: &[u8], salt: &[u8], s: &str) -> String {
-    let alphabet = Alphabet::numeric();
-    let right_padded = format!("{s:0<12}");
-    let encrypted = alphabet.encrypt(&secret_key, salt, &right_padded).unwrap();
-    let random = rand::random_range(1..=9u8);
-    format!("{encrypted}{}", random)
-}
-
-fn decrypt_fractional(secret_key: &[u8], salt: &[u8], s: &str) -> String {
-    let alphabet = Alphabet::numeric();
-    let unpadded = &s[0..s.len() - 1];
-    let decrypted = alphabet.decrypt(&secret_key, salt, &unpadded).unwrap();
-
-    let trimmed = decrypted.trim_start_matches('0');
-
-    match trimmed.is_empty() {
-        true => "0",
-        false => trimmed,
-    }
-    .to_string()
-}
-
-#[test]
-fn enc_dec_number() {
-    for i in 0..100 {
-        let password = i.to_string();
-        let key = kdf::generate(password).unwrap();
-
-        let plaintext: serde_json::Value =
-            serde_json::from_str(include_str!("../file.json")).unwrap();
-        let mut encrypted = plaintext.clone();
-
-        Spead::JsonEncrypt.traverse(&mut encrypted, String::from("#"), key);
-
-        Spead::JsonDecrypt.traverse(&mut encrypted, String::from("#"), key);
-
-        assert_eq!(encrypted, plaintext);
     }
 }
