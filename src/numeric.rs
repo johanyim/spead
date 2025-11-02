@@ -18,9 +18,7 @@ pub fn encrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String 
 
     let rand = rng.random_range(1..10u64.pow(WIDTH_U32));
 
-    //eprintln!("[enc]: rand = {rand}");
-
-    // if rand is even, flip the sign, if not, keep it the same
+    // if rand is even, flip the sign
     let new_sign = if negative ^ (rand % 2 == 0) { "-" } else { "" };
 
     //println!("new_sign = '{rand}'")
@@ -77,7 +75,7 @@ pub fn encrypt_fractional(secret_key: &[u8], nonce: &[u8], s: &str) -> String {
 
     let right_padded = format!(
         "{s:0<WIDTH$}{:0<WIDTH$}",
-        rng.random_range(1..1_000_000_000_000u64)
+        rng.random_range(1..10u64.pow(WIDTH_U32))
     );
     let encrypted = alphabet.encrypt(&secret_key, nonce, &right_padded).unwrap();
 
