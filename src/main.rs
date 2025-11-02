@@ -163,16 +163,7 @@ impl Spead {
         match node {
             serde_json::Value::Number(num) => {
                 //println!("{}", current_pointer);
-                let mut s = num.as_str();
-
-                //// TODO: encrypt sign
-                //let sign = if s.starts_with('-') {
-                //    s = &s[1..];
-                //    "-"
-                //} else {
-                //    ""
-                //}
-                //.to_string();
+                let s = num.as_str();
 
                 // NOTE: first number is random, rest is deterministic
                 let enc = match s.split_once('.') {

@@ -21,8 +21,6 @@ pub fn encrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String 
     // if rand is even, flip the sign
     let new_sign = if negative ^ (rand % 2 == 0) { "-" } else { "" };
 
-    //println!("new_sign = '{rand}'")
-
     let padded = format!("{:0>WIDTH$}{s:0>WIDTH$}", rand); // <WIDTH> padding
     let encrypted = alphabet.encrypt(&secret_key, nonce, &padded).unwrap();
 
