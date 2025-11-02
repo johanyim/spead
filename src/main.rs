@@ -152,7 +152,7 @@ pub enum Spead {
 }
 
 impl Spead {
-    // NOTE: using RFC6901 to create unique nonces on a per-struct basis
+    // NOTE: using JSON RFC6901 to create unique nonces on a per-struct basis
     fn traverse(
         &self,
         node: &mut serde_json::Value,
@@ -165,14 +165,14 @@ impl Spead {
                 //println!("{}", current_pointer);
                 let mut s = num.as_str();
 
-                // TODO: encrypt sign
-                let sign = if s.starts_with('-') {
-                    s = &s[1..];
-                    "-"
-                } else {
-                    ""
-                }
-                .to_string();
+                //// TODO: encrypt sign
+                //let sign = if s.starts_with('-') {
+                //    s = &s[1..];
+                //    "-"
+                //} else {
+                //    ""
+                //}
+                //.to_string();
 
                 // NOTE: first number is random, rest is deterministic
                 let enc = match s.split_once('.') {
@@ -230,9 +230,11 @@ impl Spead {
                 //let Some((left, right)) = s.split_once(".").unwrap();
                 //let left = &format!("{s:0>16}");
 
-                let result = sign + &enc;
+                //let result = sign + &enc;
 
-                *node = serde_json::Value::Number(Number::from_str(&result).unwrap())
+                //println!("{enc}");
+
+                *node = serde_json::Value::Number(Number::from_str(&enc).unwrap())
             }
             serde_json::Value::String(s) => {
                 let alphabet = Alphabet::utf();
