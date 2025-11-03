@@ -16,24 +16,11 @@ use prelude::*;
 use serde::Serialize;
 use serde_json::Number;
 
-#[derive(clap::ValueEnum, Clone, Default, Debug, Serialize)]
-enum EncryptionMethod {
-    #[default]
-    AES,
-    Chacha20,
-    XOR,
-}
-
-///
 #[derive(Parser, Debug)]
 #[command(version, long_about)]
 struct Cli {
     #[arg(value_name = "file")]
     input: Option<Utf8PathBuf>,
-
-    /// Which encryption method to use
-    #[arg(short, long, value_enum, default_value_t)]
-    method: EncryptionMethod,
 
     /// Encryption/Decryption key as a path to a file
     #[arg(short = 'k', long, value_name = "file")]
@@ -43,17 +30,21 @@ struct Cli {
     #[arg(short, long, value_name = "password")]
     password: Option<String>,
 
-    /// Modify the file in-place, rather than printing to stdout
-    #[arg(short, long)]
-    in_place: bool,
-
     /// Decrypt rather than encrypting
     #[arg(short, long, default_value_t = false)]
     decrypt: bool,
 
-    /// Repeat n times
-    #[arg(short = 'n', long, default_value_t = 1, value_name = "n")]
-    repeat: u16,
+    ///// Modify the file in-place, rather than printing to stdout
+    //#[arg(short, long)]
+    //in_place: bool,
+    /// Modify the file in-place, rather than printing to stdout
+    #[arg(short, long)]
+    in_place: bool,
+
+    /// Maximum recursion depth to encrypt while preserving encryption, rather than encrypting the
+    /// whole value (0 = no depth limit)
+    #[arg(short = 'L', long, default_value_t = 0)]
+    max_depth: u32,
 }
 
 fn main() -> Result<()> {
@@ -61,7 +52,7 @@ fn main() -> Result<()> {
 
     // 1.: determine the source of the input
     let mut val: serde_json::Value = match cli.input {
-        Some(file) if file.exists() => {
+        Some(ref file) if file.exists() => {
             // open file and read to value
             let f = std::fs::File::open(file).unwrap();
             let mut reader = std::io::BufReader::new(f);
@@ -97,7 +88,7 @@ fn main() -> Result<()> {
     };
 
     // 2.: Password
-    let password = match (cli.password, cli.password_file) {
+    let password = match (cli.password.as_ref(), cli.password_file.as_ref()) {
         (Some(_), Some(_)) => {
             let mut cmd = Cli::command();
             cmd.error(
@@ -106,7 +97,7 @@ fn main() -> Result<()> {
             )
             .exit();
         }
-        (Some(p), None) => p,
+        (Some(p), None) => p.to_string(),
         (None, Some(f)) => std::fs::read_to_string(f).expect("Failed to read file"),
         (None, None) => {
             write!(std::io::stderr(), "Password: ").unwrap();
@@ -122,19 +113,19 @@ fn main() -> Result<()> {
                 std::process::exit(1);
             }
 
-            password
+            password.to_string()
         }
     };
 
     // 3.: key derivation
-    let secret_key = encryption::kdf::generate(password)?;
+    let secret_key = encryption::kdf::generate(password.to_string())?;
 
     let method = match cli.decrypt {
         true => Spead::JsonDecrypt,
         false => Spead::JsonEncrypt,
     };
 
-    method.traverse(&mut val, String::from("#"), secret_key);
+    method.traverse(&cli, &mut val, String::from("#"), secret_key, 1);
 
     let output = serde_json::to_string_pretty(&val).unwrap();
 
@@ -155,9 +146,11 @@ impl Spead {
     // NOTE: using JSON RFC6901 to create unique nonces on a per-struct basis
     fn traverse(
         &self,
+        cli: &Cli,
         node: &mut serde_json::Value,
         current_pointer: String,
         secret_key: [u8; KEY_LEN],
+        depth: u32,
     ) {
         //println!("{current_pointer}");
         match node {
@@ -241,13 +234,35 @@ impl Spead {
             }
             serde_json::Value::Array(values) => {
                 for (i, val) in values.iter_mut().enumerate() {
-                    self.traverse(val, format!("{current_pointer}/{i}"), secret_key);
+                    self.traverse(
+                        cli,
+                        val,
+                        format!("{current_pointer}/{i}"),
+                        secret_key,
+                        depth,
+                    );
                 }
             }
             serde_json::Value::Object(map) => {
-                for (k, v) in map {
-                    //println!("{k}");
-                    self.traverse(v, format!("{current_pointer}/{k}"), secret_key)
+                if cli.max_depth < depth && cli.max_depth > 0 {
+                    let alphabet = Alphabet::utf();
+                    let s = serde_json::to_string(map).unwrap();
+                    *node = serde_json::Value::String(
+                        alphabet
+                            .encrypt(&secret_key, current_pointer.as_bytes(), &s)
+                            .unwrap(),
+                    );
+                } else {
+                    for (k, v) in map {
+                        //println!("{k}");
+                        self.traverse(
+                            cli,
+                            v,
+                            format!("{current_pointer}/{k}"),
+                            secret_key,
+                            depth + 1,
+                        )
+                    }
                 }
             }
             _ => {}
