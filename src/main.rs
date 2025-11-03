@@ -222,15 +222,28 @@ impl Spead {
             }
             serde_json::Value::String(s) => {
                 let alphabet = Alphabet::utf();
-                let x = match self {
-                    Spead::JsonEncrypt => alphabet
-                        .encrypt(&secret_key, current_pointer.as_bytes(), &s)
-                        .unwrap(),
-                    Spead::JsonDecrypt => alphabet
-                        .decrypt(&secret_key, current_pointer.as_bytes(), &s)
-                        .unwrap(),
+                match self {
+                    Spead::JsonEncrypt => {
+                        let encrypted = alphabet
+                            .encrypt(&secret_key, current_pointer.as_bytes(), &s)
+                            .unwrap();
+                        *node = serde_json::Value::String(encrypted);
+                    }
+                    Spead::JsonDecrypt => {
+                        // NOTE: may be affected by json strings
+                        let decrypted = alphabet
+                            .decrypt(&secret_key, current_pointer.as_bytes(), &s)
+                            .unwrap();
+                        if decrypted.starts_with("json") {
+                            match serde_json::from_str(&decrypted[4..]) {
+                                Ok(obj) => *node = serde_json::Value::Object(obj),
+                                Err(_) => *node = serde_json::Value::String(decrypted),
+                            }
+                        } else {
+                            *node = serde_json::Value::String(decrypted)
+                        }
+                    }
                 };
-                *node = serde_json::Value::String(x);
             }
             serde_json::Value::Array(values) => {
                 for (i, val) in values.iter_mut().enumerate() {
@@ -243,10 +256,12 @@ impl Spead {
                     );
                 }
             }
+
             serde_json::Value::Object(map) => {
+                // TODO: decrypt finite depth encrypted file
                 if cli.max_depth < depth && cli.max_depth > 0 {
                     let alphabet = Alphabet::utf();
-                    let s = serde_json::to_string(map).unwrap();
+                    let s = String::from("json") + &serde_json::to_string(map).unwrap();
                     *node = serde_json::Value::String(
                         alphabet
                             .encrypt(&secret_key, current_pointer.as_bytes(), &s)
