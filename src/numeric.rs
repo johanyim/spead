@@ -98,3 +98,33 @@ pub fn decrypt_fractional(secret_key: &[u8], nonce: &[u8], s: &str) -> String {
     }
     .to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use rand::TryRngCore;
+    use rand_core::OsRng;
+
+    use crate::utils::KEY_LEN;
+    use proptest::prelude::*;
+
+    use super::*;
+
+    #[test]
+    fn integer_encrypt_then_decrypt() {
+        let mut key = [0; KEY_LEN];
+        let mut nonce = [0; KEY_LEN];
+        OsRng.try_fill_bytes(&mut key).unwrap();
+        OsRng.try_fill_bytes(&mut nonce).unwrap();
+
+        let int: u64 = 1293809218301830980;
+        let original = int.to_string();
+
+        let encrypted = encrypt_integral(&key, &nonce, &original);
+
+        assert_ne!(original, encrypted);
+
+        let decrypted = decrypt_integral(&key, &nonce, &encrypted);
+
+        assert_eq!(original, decrypted);
+    }
+}

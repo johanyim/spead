@@ -1,8 +1,10 @@
+pub const SALT_LEN: usize = 16;
+pub const KEY_LEN: usize = 32;
+
 use argon2::Argon2;
 
-use super::{KEY_LEN, SALT_LEN};
-
-pub fn generate(password: String) -> argon2::Result<[u8; KEY_LEN]> {
+/// key derivation function
+pub(crate) fn kdf(password: String) -> argon2::Result<[u8; KEY_LEN]> {
     let password = password.as_bytes();
 
     // no salt

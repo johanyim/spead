@@ -1,7 +1,7 @@
-mod encryption;
 mod error;
 mod numeric;
 mod prelude;
+mod utils;
 
 use std::{
     io::{stdin, Read, Write},
@@ -11,10 +11,10 @@ use std::{
 use camino::Utf8PathBuf;
 use clap::{arg, error::ErrorKind, CommandFactory, Parser};
 use cloudproof_fpe::core::Alphabet;
-use encryption::KEY_LEN;
 use prelude::*;
 use serde::Serialize;
 use serde_json::Number;
+use utils::KEY_LEN;
 
 #[derive(Parser, Debug)]
 #[command(version, long_about)]
@@ -118,7 +118,7 @@ fn main() -> Result<()> {
     };
 
     // 3.: key derivation
-    let secret_key = encryption::kdf::generate(password.to_string())?;
+    let secret_key = utils::kdf(password.to_string())?;
 
     let method = match cli.decrypt {
         true => Spead::JsonDecrypt,
@@ -211,13 +211,6 @@ impl Spead {
                     }
                 };
 
-                //let Some((left, right)) = s.split_once(".").unwrap();
-                //let left = &format!("{s:0>16}");
-
-                //let result = sign + &enc;
-
-                //println!("{enc}");
-
                 *node = serde_json::Value::Number(Number::from_str(&enc).unwrap())
             }
             serde_json::Value::String(s) => {
@@ -236,12 +229,14 @@ impl Spead {
                             .unwrap();
                         if decrypted.starts_with("json") {
                             match serde_json::from_str(&decrypted[4..]) {
-                                Ok(obj) => *node = serde_json::Value::Object(obj),
-                                Err(_) => *node = serde_json::Value::String(decrypted),
+                                Ok(obj) => {
+                                    *node = serde_json::Value::Object(obj);
+                                    return;
+                                }
+                                Err(_) => {}
                             }
-                        } else {
-                            *node = serde_json::Value::String(decrypted)
                         }
+                        *node = serde_json::Value::String(decrypted)
                     }
                 };
             }
