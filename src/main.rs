@@ -160,22 +160,14 @@ impl Spead {
 
                 // NOTE: first number is random, rest is deterministic
                 let enc = match s.split_once('.') {
-                    None => {
-                        match self {
-                            Spead::JsonEncrypt => numeric::encrypt_integral(
-                                &secret_key,
-                                current_pointer.as_bytes(),
-                                &s,
-                            ),
-                            Spead::JsonDecrypt => numeric::decrypt_integral(
-                                &secret_key,
-                                current_pointer.as_bytes(),
-                                &s,
-                            ),
+                    None => match self {
+                        Spead::JsonEncrypt => {
+                            numeric::encrypt_integral(&secret_key, current_pointer.as_bytes(), &s)
                         }
-
-                        //encrypted.trim_start_matches('0').to_string()
-                    }
+                        Spead::JsonDecrypt => {
+                            numeric::decrypt_integral(&secret_key, current_pointer.as_bytes(), &s)
+                        }
+                    },
                     Some((left, right)) => {
                         let left_pointer = format!("{current_pointer}/left");
                         let right_pointer = format!("{current_pointer}/right");

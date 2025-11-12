@@ -5,7 +5,7 @@ const WIDTH: usize = 8;
 const WIDTH_U32: u32 = 8;
 
 pub fn encrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String {
-    assert!(!s.starts_with("0"));
+    assert!(!s.trim_start_matches('-').starts_with("0"));
 
     let negative = if s.starts_with('-') {
         s = &s[1..];
@@ -24,18 +24,20 @@ pub fn encrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String 
     let new_sign = if negative ^ (rand % 2 == 0) { "-" } else { "" };
 
     let padded = format!("{:0>WIDTH$}{s:0>WIDTH$}", rand); // <WIDTH> padding
-    let encrypted = alphabet.encrypt(&secret_key, nonce, &padded).unwrap();
+    let encrypted = alphabet
+        .encrypt(&secret_key, nonce, &padded)
+        .expect("Should properly encrypt");
 
     // add extra bit from 1-9 to ensure number doesn't begin with '0'
     let res = format!("{new_sign}{}{encrypted}", rand::random_range(1..=9u8));
 
-    assert!(!res.starts_with('0'));
+    assert!(!res.trim_start_matches('-').starts_with('0'));
 
     res
 }
 
 pub fn decrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String {
-    assert!(!s.starts_with('0'));
+    assert!(!s.trim_start_matches('-').starts_with('0'));
 
     let negative = if s.starts_with('-') {
         s = &s[1..];
@@ -49,9 +51,14 @@ pub fn decrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String 
     // remove first digit
     let unpadded = &s[1..];
 
-    let decrypted = alphabet.decrypt(&secret_key, nonce, &unpadded).unwrap();
+    let decrypted = alphabet
+        .decrypt(&secret_key, nonce, &unpadded)
+        .expect("Should properly decrypt");
 
-    let rand = decrypted.chars().nth(WIDTH - 1).unwrap();
+    let rand = decrypted
+        .chars()
+        .nth(WIDTH - 1)
+        .expect("Number post-decryption should be at least more than WIDTH characters");
 
     //eprintln!("[dec]: rand = {rand}");
 
@@ -73,7 +80,7 @@ pub fn decrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String 
         }
     );
 
-    assert!(!res.starts_with('0'));
+    assert!(!s.trim_start_matches('-').starts_with('0'));
 
     res
 }
@@ -89,7 +96,9 @@ pub fn encrypt_fractional(secret_key: &[u8], nonce: &[u8], s: &str) -> String {
         "{s:0<WIDTH$}{:0<WIDTH$}",
         rng.random_range(1..10u64.pow(WIDTH_U32))
     );
-    let encrypted = alphabet.encrypt(&secret_key, nonce, &right_padded).unwrap();
+    let encrypted = alphabet
+        .encrypt(&secret_key, nonce, &right_padded)
+        .expect("Should properly encrypt");
 
     // add extra bit from 1-9 to ensure number doesn't end in '0'
     let res = format!("{encrypted}{}", rand::random_range(1..=9u8));
@@ -106,7 +115,9 @@ pub fn decrypt_fractional(secret_key: &[u8], nonce: &[u8], s: &str) -> String {
     // remove last digit
     let unpadded = &s[0..s.len() - 1];
 
-    let decrypted = alphabet.decrypt(&secret_key, nonce, &unpadded).unwrap();
+    let decrypted = alphabet
+        .decrypt(&secret_key, nonce, &unpadded)
+        .expect("Should properly decrypt");
     let unpadded2 = &decrypted[0..s.len() - 1 - WIDTH]; // remove <WIDTH> digit padding
 
     let trimmed = unpadded2.trim_end_matches('0');
