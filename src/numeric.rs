@@ -5,6 +5,8 @@ const WIDTH: usize = 8;
 const WIDTH_U32: u32 = 8;
 
 pub fn encrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String {
+    assert!(!s.starts_with("0"));
+
     let negative = if s.starts_with('-') {
         s = &s[1..];
         true
@@ -25,10 +27,16 @@ pub fn encrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String 
     let encrypted = alphabet.encrypt(&secret_key, nonce, &padded).unwrap();
 
     // add extra bit from 1-9 to ensure number doesn't begin with '0'
-    format!("{new_sign}{}{encrypted}", rand::random_range(1..=9u8))
+    let res = format!("{new_sign}{}{encrypted}", rand::random_range(1..=9u8));
+
+    assert!(!res.starts_with('0'));
+
+    res
 }
 
 pub fn decrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String {
+    assert!(!s.starts_with('0'));
+
     let negative = if s.starts_with('-') {
         s = &s[1..];
         true
@@ -57,16 +65,22 @@ pub fn decrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String 
 
     let trimmed = unpadded2.trim_start_matches('0');
     // special case for decrypting '0'
-    format!(
+    let res = format!(
         "{new_sign}{}",
         match trimmed.is_empty() {
             true => "0",
             false => trimmed,
         }
-    )
+    );
+
+    assert!(!res.starts_with('0'));
+
+    res
 }
 
 pub fn encrypt_fractional(secret_key: &[u8], nonce: &[u8], s: &str) -> String {
+    assert!(!s.ends_with('0'));
+
     let alphabet = Alphabet::numeric();
 
     let mut rng = rand::rng();
@@ -78,10 +92,15 @@ pub fn encrypt_fractional(secret_key: &[u8], nonce: &[u8], s: &str) -> String {
     let encrypted = alphabet.encrypt(&secret_key, nonce, &right_padded).unwrap();
 
     // add extra bit from 1-9 to ensure number doesn't end in '0'
-    format!("{encrypted}{}", rand::random_range(1..=9u8))
+    let res = format!("{encrypted}{}", rand::random_range(1..=9u8));
+
+    assert!(!res.ends_with('0'));
+
+    res
 }
 
 pub fn decrypt_fractional(secret_key: &[u8], nonce: &[u8], s: &str) -> String {
+    assert!(!s.ends_with('0'));
     let alphabet = Alphabet::numeric();
 
     // remove last digit
@@ -92,11 +111,15 @@ pub fn decrypt_fractional(secret_key: &[u8], nonce: &[u8], s: &str) -> String {
 
     let trimmed = unpadded2.trim_end_matches('0');
 
-    match trimmed.is_empty() {
+    let res = match trimmed.is_empty() {
         true => "0",
         false => trimmed,
     }
-    .to_string()
+    .to_string();
+
+    assert!(!res.ends_with('0'));
+
+    res
 }
 
 #[cfg(test)]
@@ -111,20 +134,43 @@ mod tests {
 
     #[test]
     fn integer_encrypt_then_decrypt() {
-        let mut key = [0; KEY_LEN];
-        let mut nonce = [0; KEY_LEN];
-        OsRng.try_fill_bytes(&mut key).unwrap();
-        OsRng.try_fill_bytes(&mut nonce).unwrap();
+        for _ in 0..1000 {
+            let mut key = [0; KEY_LEN];
+            let mut nonce = [0; KEY_LEN];
+            OsRng.try_fill_bytes(&mut key).unwrap();
+            OsRng.try_fill_bytes(&mut nonce).unwrap();
 
-        let int: u64 = 1293809218301830980;
-        let original = int.to_string();
+            let int: u64 = rand::random();
+            let original = int.to_string();
 
-        let encrypted = encrypt_integral(&key, &nonce, &original);
+            let encrypted = encrypt_integral(&key, &nonce, &original);
 
-        assert_ne!(original, encrypted);
+            assert_ne!(original, encrypted);
 
-        let decrypted = decrypt_integral(&key, &nonce, &encrypted);
+            let decrypted = decrypt_integral(&key, &nonce, &encrypted);
 
-        assert_eq!(original, decrypted);
+            assert_eq!(original, decrypted);
+        }
+    }
+
+    #[test]
+    fn fractional_encrypt_then_decrypt() {
+        for _ in 0..1000 {
+            let mut key = [0; KEY_LEN];
+            let mut nonce = [0; KEY_LEN];
+            OsRng.try_fill_bytes(&mut key).unwrap();
+            OsRng.try_fill_bytes(&mut nonce).unwrap();
+
+            let int: f64 = rand::random();
+            let original = int.to_string().split_once(".").unwrap().1.to_string();
+
+            let encrypted = encrypt_fractional(&key, &nonce, &original);
+
+            assert_ne!(original, encrypted);
+
+            let decrypted = decrypt_fractional(&key, &nonce, &encrypted);
+
+            assert_eq!(original, decrypted);
+        }
     }
 }
