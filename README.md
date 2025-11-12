@@ -43,7 +43,7 @@ cargo install --path .
 
 ## Features
 
-- **Encryption**: 
+- **Encryption**: Values are obfuscated post encryption, and can be decrypted with the original key.
 
 - **Schema Preservation**: Ensures the original JSON structure and data types remain intact after encryption.
 
