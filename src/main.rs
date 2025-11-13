@@ -168,19 +168,17 @@ impl Spead {
                             numeric::decrypt_integral(&secret_key, current_pointer.as_bytes(), &s)
                         }
                     },
-                    Some((left, right)) => {
-                        let left_pointer = format!("{current_pointer}/left");
-                        let right_pointer = format!("{current_pointer}/right");
 
+                    Some((left, right)) => {
                         let left_enc = match self {
                             Spead::JsonEncrypt => numeric::encrypt_integral(
                                 &secret_key,
-                                left_pointer.as_bytes(),
+                                &[current_pointer.as_bytes(), &[0]].concat(),
                                 &left,
                             ),
                             Spead::JsonDecrypt => numeric::decrypt_integral(
                                 &secret_key,
-                                left_pointer.as_bytes(),
+                                &[current_pointer.as_bytes(), &[0]].concat(),
                                 &left,
                             ),
                         };
@@ -188,12 +186,12 @@ impl Spead {
                         let right_enc = match self {
                             Spead::JsonEncrypt => numeric::encrypt_fractional(
                                 &secret_key,
-                                right_pointer.as_bytes(),
+                                &[current_pointer.as_bytes(), &[1]].concat(),
                                 &right,
                             ),
                             Spead::JsonDecrypt => numeric::decrypt_fractional(
                                 &secret_key,
-                                right_pointer.as_bytes(),
+                                &[current_pointer.as_bytes(), &[1]].concat(),
                                 &right,
                             ),
                         };
