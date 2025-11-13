@@ -34,6 +34,11 @@ struct Cli {
     #[arg(short, long, default_value_t = false)]
     decrypt: bool,
 
+    // TODO:
+    /// Encrypt/Decrypt keys as well as values
+    #[arg(short = 'K', long, default_value_t = false)]
+    include_keys: bool,
+
     ///// Modify the file in-place, rather than printing to stdout
     //#[arg(short, long)]
     //in_place: bool,
@@ -208,7 +213,6 @@ impl Spead {
                         *node = serde_json::Value::String(encrypted);
                     }
                     Spead::JsonDecrypt => {
-                        // NOTE: may be affected by json strings
                         let decrypted = alphabet.decrypt(&secret_key, current_pointer, &s).unwrap();
                         if decrypted.starts_with("json") {
                             match serde_json::from_str(&decrypted[4..]) {
@@ -245,7 +249,6 @@ impl Spead {
                     );
                 } else {
                     for (k, v) in map {
-                        //println!("{k}");
                         self.traverse(
                             cli,
                             v,
