@@ -125,15 +125,13 @@ fn main() -> Result<()> {
         false => Spead::JsonEncrypt,
     };
 
-    method.traverse(&cli, &mut val, String::from("#"), secret_key, 1);
+    // 4.: encryption
+    method.traverse(&cli, &mut val, b"#", secret_key, 1);
 
-    let output = serde_json::to_string_pretty(&val).unwrap();
+    let output = serde_json::to_string(&val).unwrap();
 
-    std::io::stdout()
-        .write_all(format!("{output}").as_bytes())
-        .unwrap();
+    std::io::stdout().write_all(output.as_bytes()).unwrap();
 
-    //do the encryption!
     Ok(())
 }
 
@@ -148,7 +146,7 @@ impl Spead {
         &self,
         cli: &Cli,
         node: &mut serde_json::Value,
-        current_pointer: String,
+        current_pointer: &[u8],
         secret_key: [u8; KEY_LEN],
         depth: u32,
     ) {
@@ -162,10 +160,10 @@ impl Spead {
                 let enc = match s.split_once('.') {
                     None => match self {
                         Spead::JsonEncrypt => {
-                            numeric::encrypt_integral(&secret_key, current_pointer.as_bytes(), &s)
+                            numeric::encrypt_integral(&secret_key, current_pointer, &s)
                         }
                         Spead::JsonDecrypt => {
-                            numeric::decrypt_integral(&secret_key, current_pointer.as_bytes(), &s)
+                            numeric::decrypt_integral(&secret_key, current_pointer, &s)
                         }
                     },
 
@@ -173,12 +171,12 @@ impl Spead {
                         let left_enc = match self {
                             Spead::JsonEncrypt => numeric::encrypt_integral(
                                 &secret_key,
-                                &[current_pointer.as_bytes(), &[0]].concat(),
+                                &[current_pointer, &[0]].concat(),
                                 &left,
                             ),
                             Spead::JsonDecrypt => numeric::decrypt_integral(
                                 &secret_key,
-                                &[current_pointer.as_bytes(), &[0]].concat(),
+                                &[current_pointer, &[0]].concat(),
                                 &left,
                             ),
                         };
@@ -186,18 +184,17 @@ impl Spead {
                         let right_enc = match self {
                             Spead::JsonEncrypt => numeric::encrypt_fractional(
                                 &secret_key,
-                                &[current_pointer.as_bytes(), &[1]].concat(),
+                                &[current_pointer, &[1]].concat(),
                                 &right,
                             ),
                             Spead::JsonDecrypt => numeric::decrypt_fractional(
                                 &secret_key,
-                                &[current_pointer.as_bytes(), &[1]].concat(),
+                                &[current_pointer, &[1]].concat(),
                                 &right,
                             ),
                         };
 
                         left_enc + "." + &right_enc
-                        //format!("{}.{}", left_enc, right_enc)
                     }
                 };
 
@@ -207,16 +204,12 @@ impl Spead {
                 let alphabet = Alphabet::utf();
                 match self {
                     Spead::JsonEncrypt => {
-                        let encrypted = alphabet
-                            .encrypt(&secret_key, current_pointer.as_bytes(), &s)
-                            .unwrap();
+                        let encrypted = alphabet.encrypt(&secret_key, current_pointer, &s).unwrap();
                         *node = serde_json::Value::String(encrypted);
                     }
                     Spead::JsonDecrypt => {
                         // NOTE: may be affected by json strings
-                        let decrypted = alphabet
-                            .decrypt(&secret_key, current_pointer.as_bytes(), &s)
-                            .unwrap();
+                        let decrypted = alphabet.decrypt(&secret_key, current_pointer, &s).unwrap();
                         if decrypted.starts_with("json") {
                             match serde_json::from_str(&decrypted[4..]) {
                                 Ok(obj) => {
@@ -231,11 +224,11 @@ impl Spead {
                 };
             }
             serde_json::Value::Array(values) => {
-                for (i, val) in values.iter_mut().enumerate() {
+                for (val, i) in values.iter_mut().zip(0u8..) {
                     self.traverse(
                         cli,
                         val,
-                        format!("{current_pointer}/{i}"),
+                        &[current_pointer, &[i]].concat(),
                         secret_key,
                         depth,
                     );
@@ -248,9 +241,7 @@ impl Spead {
                     let alphabet = Alphabet::utf();
                     let s = String::from("json") + &serde_json::to_string(map).unwrap();
                     *node = serde_json::Value::String(
-                        alphabet
-                            .encrypt(&secret_key, current_pointer.as_bytes(), &s)
-                            .unwrap(),
+                        alphabet.encrypt(&secret_key, current_pointer, &s).unwrap(),
                     );
                 } else {
                     for (k, v) in map {
@@ -258,7 +249,7 @@ impl Spead {
                         self.traverse(
                             cli,
                             v,
-                            format!("{current_pointer}/{k}"),
+                            &[current_pointer, k.as_bytes()].concat(),
                             secret_key,
                             depth + 1,
                         )
