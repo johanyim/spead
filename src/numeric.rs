@@ -4,8 +4,13 @@ use rand::Rng;
 const WIDTH: usize = 8;
 const WIDTH_U32: u32 = 8;
 
+/// Handles integer parts of decimals or entire integers
+/// uses the salt generated to handle obfuscating the negative sign
+///
+/// |--1--|----1----|----------WIDTH-----------|----------WIDTH-----------|
+/// |sign-|--{1-9}--|-----------SALT-----------|--PADDING--||--plaintext--|
 pub fn encrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String {
-    assert!(!s.trim_start_matches('-').starts_with("0"));
+    assert!(!s.trim_start_matches('-').starts_with("0") || s == "0");
 
     let negative = if s.starts_with('-') {
         s = &s[1..];
@@ -23,7 +28,7 @@ pub fn encrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String 
     // if rand is even, flip the sign
     let new_sign = if negative ^ (rand % 2 == 0) { "-" } else { "" };
 
-    let padded = format!("{:0>WIDTH$}{s:0>WIDTH$}", rand); // <WIDTH> padding
+    let padded = format!("{rand:0>WIDTH$}{s:0>WIDTH$}"); // <WIDTH> padding
     let encrypted = alphabet
         .encrypt(&secret_key, nonce, &padded)
         .expect("Should properly encrypt");
@@ -31,13 +36,13 @@ pub fn encrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String 
     // add extra bit from 1-9 to ensure number doesn't begin with '0'
     let res = format!("{new_sign}{}{encrypted}", rand::random_range(1..=9u8));
 
-    assert!(!res.trim_start_matches('-').starts_with('0'));
+    assert!(!res.trim_start_matches('-').starts_with('0') || res == "0");
 
     res
 }
 
 pub fn decrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String {
-    assert!(!s.trim_start_matches('-').starts_with('0'));
+    assert!(!s.trim_start_matches('-').starts_with('0') || s == "0");
 
     let negative = if s.starts_with('-') {
         s = &s[1..];
@@ -80,13 +85,13 @@ pub fn decrypt_integral(secret_key: &[u8], nonce: &[u8], mut s: &str) -> String 
         }
     );
 
-    assert!(!s.trim_start_matches('-').starts_with('0'));
+    assert!(!s.trim_start_matches('-').starts_with('0') || s == "0");
 
     res
 }
 
 pub fn encrypt_fractional(secret_key: &[u8], nonce: &[u8], s: &str) -> String {
-    assert!(!s.ends_with('0'));
+    assert!(!s.ends_with('0') || s == "0");
 
     let alphabet = Alphabet::numeric();
 
@@ -103,13 +108,13 @@ pub fn encrypt_fractional(secret_key: &[u8], nonce: &[u8], s: &str) -> String {
     // add extra bit from 1-9 to ensure number doesn't end in '0'
     let res = format!("{encrypted}{}", rand::random_range(1..=9u8));
 
-    assert!(!res.ends_with('0'));
+    assert!(!res.ends_with('0') || res == "0");
 
     res
 }
 
 pub fn decrypt_fractional(secret_key: &[u8], nonce: &[u8], s: &str) -> String {
-    assert!(!s.ends_with('0'));
+    assert!(!s.ends_with('0') || s == "0");
     let alphabet = Alphabet::numeric();
 
     // remove last digit
@@ -128,7 +133,7 @@ pub fn decrypt_fractional(secret_key: &[u8], nonce: &[u8], s: &str) -> String {
     }
     .to_string();
 
-    assert!(!res.ends_with('0'));
+    assert!(!res.ends_with('0') || res == "0");
 
     res
 }

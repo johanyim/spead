@@ -1,7 +1,7 @@
 [package]
 name = "spead"
 description = "Structure Preserving Encryption and Decryption CLI tool"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 authors = ["Johan Yim <johanjyyim@gmail.com>"]
 license = "GPL-3.0"
@@ -18,14 +18,14 @@ atty = "0.2.14"
 camino = "1.2.1"
 clap = { version = "4.5.49", features = ["derive"] }
 cloudproof_fpe = "0.2.2"
+# pseudonym = "0.2.3"
 rand = "0.9.2"
-rand_core = "0.9.3"
 rpassword = "7.4.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.145", features = ["arbitrary_precision", "preserve_order"] }
-serde_toml = "0.0.1"
-serde_yaml = "0.9.34"
+# TODO: get rid of this dependency?
 thiserror = "2.0.17"
+
 
 [dev-dependencies]
 proptest = "1.9.0"
