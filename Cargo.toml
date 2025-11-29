@@ -25,7 +25,15 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.145", features = ["arbitrary_precision", "preserve_order"] }
 # TODO: get rid of this dependency?
 thiserror = "2.0.17"
-
+getrandom = { version = "0.3.4", features = ["wasm_js"], optional = true}
 
 [dev-dependencies]
 proptest = "1.9.0"
+
+[features]
+wasm = ["dep:getrandom"]
+
+
+#[]
+
+

@@ -37,10 +37,6 @@ impl Spead {
         Self::default()
     }
 
-    // Builder methods
-    //
-
-    // Key is actually the password file not the raw key
     pub fn secret_key(mut self, secret_key: [u8; KEY_LEN]) -> Self {
         self.key = secret_key;
         self

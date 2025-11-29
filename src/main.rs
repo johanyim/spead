@@ -11,13 +11,21 @@ struct Cli {
     #[arg(value_name = "file")]
     input: Option<Utf8PathBuf>,
 
-    /// Encryption/Decryption key as a path to a file
-    #[arg(short = 'k', long, value_name = "file")]
-    password_file: Option<Utf8PathBuf>,
-
     /// Encryption/Decryption key as an argument
-    #[arg(short, long, value_name = "password")]
+    #[arg(short = 'k', long, value_name = "secret_key")]
+    key: Option<String>,
+
+    /// Encryption/Decryption key as a path to a file
+    #[arg(short = 'K', long, value_name = "file")]
+    key_file: Option<Utf8PathBuf>,
+
+    /// Encryption/Decryption password as an argument
+    #[arg(short = 'p', long, value_name = "password")]
     password: Option<String>,
+
+    /// Encryption/Decryption password as a path to a file
+    #[arg(short = 'P', long, value_name = "file")]
+    password_file: Option<Utf8PathBuf>,
 
     /// Decrypt rather than encrypting
     #[arg(short, long, default_value_t = false)]
@@ -25,7 +33,7 @@ struct Cli {
 
     // TODO:
     /// Encrypt/Decrypt keys as well as values
-    #[arg(short = 'K', long, default_value_t = false)]
+    #[arg(short = 'I', long, default_value_t = false)]
     include_keys: bool,
 
     /// Maximum recursion depth to encrypt while preserving encryption, rather than encrypting the
@@ -64,7 +72,7 @@ fn main() -> Result<()> {
             // TODO: determine the type of file
 
             if atty::is(atty::Stream::Stdin) {
-                // Stdin is from a terminal → not piped
+                // Stdin is from a terminal = not piped
                 let mut cmd = Cli::command();
                 cmd.error(
                     ErrorKind::ValueValidation,
@@ -78,18 +86,18 @@ fn main() -> Result<()> {
     };
 
     // 2.: Password
-    let password = match (cli.password.as_ref(), cli.password_file.as_ref()) {
-        (Some(_), Some(_)) => {
-            let mut cmd = Cli::command();
-            cmd.error(
-                ErrorKind::ArgumentConflict,
-                format!("unsure whether to use raw key or key from file"),
-            )
-            .exit();
+    let secret_key = match (cli.password, cli.password_file, cli.key, cli.key_file) {
+        (Some(s), None, None, None) => utils::kdf(&s)?,
+        (None, Some(f), None, None) => {
+            let s = std::fs::read_to_string(f).expect("Failed to read file");
+            utils::kdf(&s)?
         }
-        (Some(p), None) => p.to_string(),
-        (None, Some(f)) => std::fs::read_to_string(f).expect("Failed to read file"),
-        (None, None) => {
+        (None, None, Some(s), None) => <[u8; 32]>::try_from(s.as_bytes()).unwrap(),
+        (None, None, None, Some(f)) => {
+            let s = std::fs::read_to_string(f).expect("Failed to read file");
+            <[u8; 32]>::try_from(s.as_bytes()).unwrap()
+        }
+        (None, None, None, None) => {
             write!(std::io::stderr(), "Password: ").unwrap();
             std::io::stderr().flush().unwrap();
             let password = rpassword::read_password().unwrap();
@@ -103,12 +111,18 @@ fn main() -> Result<()> {
                 std::process::exit(1);
             }
 
-            password.to_string()
+            utils::kdf(&password)?
+        }
+        _ => {
+            let mut cmd = Cli::command();
+
+            cmd.error(
+                ErrorKind::ArgumentConflict,
+                format!("Two or more arguments are in conflict"),
+            )
+            .exit();
         }
     };
-
-    // 3.: key derivation
-    let secret_key = utils::kdf(&password)?;
 
     // 4.: creating the encryption/decryption struct
     let spead = Spead::new()
