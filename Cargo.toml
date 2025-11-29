@@ -6,10 +6,13 @@ edition = "2024"
 authors = ["Johan Yim <johanjyyim@gmail.com>"]
 license-file = "LICENSE"
 repository = "https://github.com/johanyim/spead"
-homepage = "https://github.com/johanyim/spead"
+homepage = "https://spead.johanyim.com"
 categories = ["command-line-utilities"]
 keywords = ["cli", "encryption", "cryptography"]
 readme = "README.md"
+
+[badges]
+maintenance = { status = "experimental" }
 
 [dependencies]
 anyhow = "1.0.100"
